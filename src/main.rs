@@ -1,7 +1,9 @@
+mod chip8;
+use chip8::Chip8;
+use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
 use std::time::Duration;
 
-use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
-
+use crate::chip8::LoadFont;
 mod constants;
 fn main() {
     // opening sdl and creating a window
@@ -14,6 +16,8 @@ fn main() {
         .unwrap();
 
     let mut canvas = window.into_canvas(); // where to write pixels
+    let mut chip8 = Chip8::default();
+    chip8.load_fonts(&constants::FONTS);
     canvas.set_draw_color(Color::RGB(255, 0, 0));
     canvas.clear();
     canvas.present(); // renders window, showing what changed.
