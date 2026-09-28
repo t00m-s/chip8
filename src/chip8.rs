@@ -33,6 +33,13 @@ impl Default for Chip8 {
         }
     }
 }
+
+impl Chip8 {
+    pub fn memory(&self) -> &[u8; 4096] {
+        &self.memory
+    }
+}
+
 impl LoadFont for Chip8 {
     fn load_fonts(&mut self, fonts: &[u8; 80]) {
         // fonts start at address 0x50 as a convention.

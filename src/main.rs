@@ -1,11 +1,7 @@
-mod chip8;
-use chip8::Chip8;
+use chip8_emulator::chip8::{Chip8, LoadFont, LoadRom};
+use chip8_emulator::constants;
 use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
 use std::time::Duration;
-
-use crate::chip8::{LoadFont, LoadRom};
-mod constants;
-mod rom;
 
 fn main() {
     // opening sdl and creating a window
