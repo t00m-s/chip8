@@ -1,8 +1,9 @@
+use super::rom::read_rom_from_path;
 pub trait LoadFont {
     fn load_fonts(&mut self, fonts: &[u8; 80]);
 }
 pub trait LoadRom {
-    fn load_rom(&mut self, rom: &[u8]);
+    fn load_rom(&mut self, rom_path: &str);
 }
 pub struct Chip8 {
     memory: [u8; 4096],
@@ -35,13 +36,19 @@ impl Default for Chip8 {
 impl LoadFont for Chip8 {
     fn load_fonts(&mut self, fonts: &[u8; 80]) {
         // fonts start at address 0x50 as a convention.
+        // no need to add the if clause, fonts are fixed size and memory is 4kb
         self.memory[0x50..0x50 + fonts.len()].copy_from_slice(fonts)
     }
 }
 
 impl LoadRom for Chip8 {
-    fn load_rom(&mut self, rom: &[u8]) {
+    fn load_rom(&mut self, rom_path: &str) {
+        // Safety check: ROM must fit in memory
         // rom loading starts at address 0x200
-        self.memory[0x200..0x200 + rom.len()].copy_from_slice(rom);
+        let rom = read_rom_from_path(rom_path);
+        if rom.len() + 0x200 > self.memory.len() {
+            panic!("ROM too large for memory: {} bytes", rom.len());
+        }
+        self.memory[0x200..0x200 + rom.len()].copy_from_slice(&rom);
     }
 }

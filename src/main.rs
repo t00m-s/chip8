@@ -3,8 +3,10 @@ use chip8::Chip8;
 use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
 use std::time::Duration;
 
-use crate::chip8::LoadFont;
+use crate::chip8::{LoadFont, LoadRom};
 mod constants;
+mod rom;
+
 fn main() {
     // opening sdl and creating a window
     let sdl_context = sdl3::init().unwrap();
@@ -18,6 +20,7 @@ fn main() {
     let mut canvas = window.into_canvas(); // where to write pixels
     let mut chip8 = Chip8::default();
     chip8.load_fonts(&constants::FONTS);
+    chip8.load_rom("../roms/ibm-logo.ch8");
     canvas.set_draw_color(Color::RGB(255, 0, 0));
     canvas.clear();
     canvas.present(); // renders window, showing what changed.
