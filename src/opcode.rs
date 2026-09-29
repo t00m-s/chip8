@@ -1,0 +1,25 @@
+// http://devernay.free.fr/hacks/chip8/C8TECH10.HTM
+pub enum InstructionType {
+    // using the inst prefix for instructions, allows me to have numbers in enum
+    Inst00E0,
+    Inst00EE,
+    Inst1NNN,
+    Inst2NNN,
+    Inst3XNN,
+    Inst4XNN,
+    Inst5XY0,
+    Inst6XNN,
+    Inst7XNN,
+    Inst9XY0,
+    InstANNN,
+    InstBNNN,
+    Inst8XY0,
+    Inst8XY1,
+    Inst8XY2,
+    Inst8XY3,
+    Inst8XY4,
+    Inst8XY5,
+    Inst8XY6,
+    Inst8XY7,
+    Inst8XYE,
+}
