@@ -16,7 +16,7 @@ trait Decode {
     fn decode(&self, opcode: u16) -> InstructionType;
 }
 trait Execute {
-    fn execute(&mut self, instruction: InstructionType, opcode: u16);
+    fn execute(&mut self, instruction: InstructionType);
 }
 
 pub trait MachineCycle {
@@ -55,6 +55,37 @@ impl Chip8 {
     pub fn memory(&self) -> &[u8; 4096] {
         &self.memory
     }
+
+    pub fn load_program(&mut self, program: &[u8]) {
+        let start = 0x200;
+        let end = start + program.len();
+        assert!(end <= self.memory.len(), "program is too large for memory");
+        self.memory[start..end].copy_from_slice(program);
+    }
+
+    pub fn registers(&self) -> &[u8; 16] {
+        &self.v
+    }
+
+    pub fn index_register(&self) -> u16 {
+        self.i
+    }
+
+    pub fn program_counter(&self) -> u16 {
+        self.pc
+    }
+
+    pub fn stack_depth(&self) -> usize {
+        self.sp
+    }
+
+    pub fn display(&self) -> &[bool; 64 * 32] {
+        &self.display
+    }
+
+    pub fn display_mut(&mut self) -> &mut [bool; 64 * 32] {
+        &mut self.display
+    }
 }
 
 impl LoadFont for Chip8 {
@@ -73,7 +104,7 @@ impl LoadRom for Chip8 {
         if rom.len() + 0x200 > self.memory.len() {
             panic!("ROM too large for memory: {} bytes", rom.len());
         }
-        self.memory[0x200..0x200 + rom.len()].copy_from_slice(&rom);
+        self.load_program(&rom);
     }
 }
 
@@ -141,7 +172,7 @@ impl Decode for Chip8 {
 }
 
 impl Execute for Chip8 {
-    fn execute(&mut self, instruction: InstructionType, opcode: u16) {
+    fn execute(&mut self, instruction: InstructionType) {
         match instruction {
             InstructionType::Inst00E0 => self.display = [false; 64 * 32],
             InstructionType::Inst00EE => {
@@ -212,6 +243,6 @@ impl MachineCycle for Chip8 {
     fn machine_cycle(&mut self) {
         let opcode = self.fetch();
         let instruction = self.decode(opcode);
-        self.execute(instruction, opcode);
+        self.execute(instruction);
     }
 }
