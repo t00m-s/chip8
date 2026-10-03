@@ -177,7 +177,7 @@ impl Execute for Chip8 {
             InstructionType::Inst00E0 => self.display = [false; 64 * 32],
             InstructionType::Inst00EE => {
                 if self.sp != 0 {
-                    self.pc = self.stack[0];
+                    self.pc = self.stack.pop_front().unwrap();
                     self.sp -= 1;
                 } else {
                     panic!("Attempting to return from an empty stack.");
@@ -205,7 +205,7 @@ impl Execute for Chip8 {
                 }
             }
             InstructionType::Inst5XY0 { x, y } => {
-                if self.v[x] != self.v[y] {
+                if self.v[x] == self.v[y] {
                     self.pc += 2;
                 }
             }
@@ -213,7 +213,7 @@ impl Execute for Chip8 {
                 self.v[x] = nn;
             }
             InstructionType::Inst7XNN { x, nn } => {
-                self.v[x] += nn;
+                self.v[x] = self.v[x].wrapping_add(nn);
             }
             InstructionType::Inst9XY0 { x, y } => {
                 if self.v[x] != self.v[y] {
