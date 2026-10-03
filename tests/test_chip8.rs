@@ -215,3 +215,141 @@ fn invalid_9xyn_opcode_panics() {
     let mut chip8 = mock_chip8(&[0x9121]);
     chip8.machine_cycle();
 }
+
+#[test]
+fn copy_register_copies_vy_into_vx() {
+    let mut chip8 = mock_chip8(&[0x61AB, 0x8210]);
+
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+
+    assert_eq!(chip8.registers()[2], 0xAB);
+}
+
+#[test]
+fn bitwise_or_updates_vx() {
+    let mut chip8 = mock_chip8(&[0x610F, 0x62F0, 0x8121]);
+
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+
+    assert_eq!(chip8.registers()[1], 0xFF);
+}
+
+#[test]
+fn bitwise_and_updates_vx() {
+    let mut chip8 = mock_chip8(&[0x61AA, 0x620F, 0x8122]);
+
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+
+    assert_eq!(chip8.registers()[1], 0x0A);
+}
+
+#[test]
+fn bitwise_xor_updates_vx() {
+    let mut chip8 = mock_chip8(&[0x61AA, 0x620F, 0x8123]);
+
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+
+    assert_eq!(chip8.registers()[1], 0xA5);
+}
+
+#[test]
+fn add_registers_sets_carry_flag() {
+    let mut without_carry = mock_chip8(&[0x6F01, 0x61A0, 0x620F, 0x8124]);
+    for _ in 0..4 {
+        without_carry.machine_cycle();
+    }
+    assert_eq!(without_carry.registers()[1], 0xAF);
+    assert_eq!(without_carry.registers()[0xF], 0);
+
+    let mut with_carry = mock_chip8(&[0x6F00, 0x61FA, 0x620A, 0x8124]);
+    for _ in 0..4 {
+        with_carry.machine_cycle();
+    }
+    assert_eq!(with_carry.registers()[1], 0x04);
+    assert_eq!(with_carry.registers()[0xF], 1);
+}
+
+#[test]
+fn subtract_vy_from_vx_sets_not_borrow_flag() {
+    let mut no_borrow = mock_chip8(&[0x610A, 0x6203, 0x8125]);
+    for _ in 0..3 {
+        no_borrow.machine_cycle();
+    }
+    assert_eq!(no_borrow.registers()[1], 0x07);
+    assert_eq!(no_borrow.registers()[0xF], 1);
+
+    let mut equal = mock_chip8(&[0x610A, 0x620A, 0x8125]);
+    for _ in 0..3 {
+        equal.machine_cycle();
+    }
+    assert_eq!(equal.registers()[1], 0);
+    assert_eq!(equal.registers()[0xF], 1);
+
+    let mut borrow = mock_chip8(&[0x6103, 0x620A, 0x8125]);
+    for _ in 0..3 {
+        borrow.machine_cycle();
+    }
+    assert_eq!(borrow.registers()[1], 0xF9);
+    assert_eq!(borrow.registers()[0xF], 0);
+}
+
+#[test]
+fn shift_right_stores_lost_bit_in_vf() {
+    let mut even = mock_chip8(&[0x6104, 0x8126]);
+    even.machine_cycle();
+    even.machine_cycle();
+    assert_eq!(even.registers()[1], 0x02);
+    assert_eq!(even.registers()[0xF], 0);
+
+    let mut odd = mock_chip8(&[0x6105, 0x8126]);
+    odd.machine_cycle();
+    odd.machine_cycle();
+    assert_eq!(odd.registers()[1], 0x02);
+    assert_eq!(odd.registers()[0xF], 1);
+}
+
+#[test]
+fn subtract_vx_from_vy_sets_not_borrow_flag() {
+    let mut no_borrow = mock_chip8(&[0x6103, 0x620A, 0x8127]);
+    for _ in 0..3 {
+        no_borrow.machine_cycle();
+    }
+    assert_eq!(no_borrow.registers()[1], 0x07);
+    assert_eq!(no_borrow.registers()[0xF], 1);
+
+    let mut equal = mock_chip8(&[0x610A, 0x620A, 0x8127]);
+    for _ in 0..3 {
+        equal.machine_cycle();
+    }
+    assert_eq!(equal.registers()[1], 0);
+    assert_eq!(equal.registers()[0xF], 1);
+
+    let mut borrow = mock_chip8(&[0x610A, 0x6203, 0x8127]);
+    for _ in 0..3 {
+        borrow.machine_cycle();
+    }
+    assert_eq!(borrow.registers()[1], 0xF9);
+    assert_eq!(borrow.registers()[0xF], 0);
+}
+
+#[test]
+fn shift_left_stores_lost_bit_in_vf() {
+    let mut without_overflow = mock_chip8(&[0x6140, 0x812E]);
+    without_overflow.machine_cycle();
+    without_overflow.machine_cycle();
+    assert_eq!(without_overflow.registers()[1], 0x80);
+    assert_eq!(without_overflow.registers()[0xF], 0);
+
+    let mut with_overflow = mock_chip8(&[0x6181, 0x812E]);
+    with_overflow.machine_cycle();
+    with_overflow.machine_cycle();
+    assert_eq!(with_overflow.registers()[1], 0x02);
+    assert_eq!(with_overflow.registers()[0xF], 1);
+}
