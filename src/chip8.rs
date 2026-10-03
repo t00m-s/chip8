@@ -226,15 +226,41 @@ impl Execute for Chip8 {
             InstructionType::InstBNNN { nnn } => {
                 self.pc = nnn + self.v[0] as u16;
             }
-            InstructionType::Inst8XY0 { x, y } => todo!(),
-            InstructionType::Inst8XY1 { x, y } => todo!(),
-            InstructionType::Inst8XY2 { x, y } => todo!(),
-            InstructionType::Inst8XY3 { x, y } => todo!(),
-            InstructionType::Inst8XY4 { x, y } => todo!(),
-            InstructionType::Inst8XY5 { x, y } => todo!(),
-            InstructionType::Inst8XY6 { x, y } => todo!(),
-            InstructionType::Inst8XY7 { x, y } => todo!(),
-            InstructionType::Inst8XYE { x, y } => todo!(),
+            InstructionType::Inst8XY0 { x, y } => {
+                self.v[x] = self.v[y];
+            }
+            InstructionType::Inst8XY1 { x, y } => {
+                self.v[x] |= self.v[y];
+            }
+            InstructionType::Inst8XY2 { x, y } => {
+                self.v[x] &= self.v[y];
+            }
+            InstructionType::Inst8XY3 { x, y } => {
+                self.v[x] ^= self.v[y];
+            }
+            InstructionType::Inst8XY4 { x, y } => {
+                let (res, overflow) = self.v[x].overflowing_add(self.v[y]);
+                self.v[x] = res;
+                self.v[0xf] = overflow as u8;
+            }
+            InstructionType::Inst8XY5 { x, y } => {
+                let (res, overflow) = self.v[x].overflowing_sub(self.v[y]);
+                self.v[x] = res;
+                self.v[0xf] = u8::from(!overflow);
+            }
+            InstructionType::Inst8XY6 { x, y } => {
+                self.v[0xf] = (self.v[x] & 0b1 == 1) as u8;
+                self.v[x] = self.v[x].wrapping_shr(1);
+            }
+            InstructionType::Inst8XY7 { x, y } => {
+                let (res, underflow) = self.v[y].overflowing_sub(self.v[x]);
+                self.v[x] = res;
+                self.v[0xf] = u8::from(!underflow);
+            }
+            InstructionType::Inst8XYE { x, y } => {
+                self.v[0xf] = (self.v[x] & 0b10000000 != 0) as u8;
+                self.v[x] = self.v[x].wrapping_shl(1);
+            }
         }
     }
 }
