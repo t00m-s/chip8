@@ -165,6 +165,7 @@ impl Decode for Chip8 {
 
             0xA000 => InstructionType::InstANNN { nnn: nnn },
             0xB000 => InstructionType::InstBNNN { nnn: nnn },
+            0xD000 => InstructionType::InstDXYN { x: x, y: y, n: n },
 
             _ => panic!("Unsupported instruction: {opcode:#06X}"),
         }
@@ -261,6 +262,7 @@ impl Execute for Chip8 {
                 self.v[0xf] = (self.v[x] & 0b10000000 != 0) as u8;
                 self.v[x] = self.v[x].wrapping_shl(1);
             }
+            InstructionType::InstDXYN { x, y, n } => todo!(),
         }
     }
 }

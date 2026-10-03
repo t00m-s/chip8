@@ -13,6 +13,7 @@ pub enum InstructionType {
     Inst9XY0 { x: usize, y: usize },
     InstANNN { nnn: u16 },
     InstBNNN { nnn: u16 },
+    InstDXYN { x: usize, y: usize, n: u8 },
     Inst8XY0 { x: usize, y: usize },
     Inst8XY1 { x: usize, y: usize },
     Inst8XY2 { x: usize, y: usize },
