@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use super::opcode::InstructionType;
 use super::rom::read_rom_from_path;
 pub trait LoadFont {
@@ -25,7 +27,7 @@ pub struct Chip8 {
     v: [u8; 16],
     i: u16,
     pc: u16,
-    stack: [u16; 16],
+    stack: VecDeque<u16>,
     sp: usize,
     delay_timer: u8,
     sound_timer: u8,
@@ -39,7 +41,7 @@ impl Default for Chip8 {
             v: [0; 16],
             i: 0,
             pc: 0x200,
-            stack: [0; 16],
+            stack: VecDeque::with_capacity(16),
             sp: 0,
             delay_timer: 0,
             sound_timer: 0,
@@ -87,6 +89,11 @@ impl Fetch for Chip8 {
 
 impl Decode for Chip8 {
     fn decode(&self, opcode: u16) -> InstructionType {
+        let nnn = opcode & 0x0FFF;
+        let nn = (opcode & 0x00FF) as u8;
+        let n = (opcode & 0x000F) as u8;
+        let x = ((opcode & 0x0F00) >> 8) as usize;
+        let y = ((opcode & 0x00F0) >> 4) as usize;
         match opcode & 0xF000 {
             0x0000 => match opcode {
                 0x00E0 => InstructionType::Inst00E0,
@@ -94,39 +101,39 @@ impl Decode for Chip8 {
                 _ => panic!("Unsupported 0x0 instruction: {opcode:#06X}"),
             },
 
-            0x1000 => InstructionType::Inst1NNN,
-            0x2000 => InstructionType::Inst2NNN,
-            0x3000 => InstructionType::Inst3XNN,
-            0x4000 => InstructionType::Inst4XNN,
+            0x1000 => InstructionType::Inst1NNN { nnn: nnn },
+            0x2000 => InstructionType::Inst2NNN { nnn: nnn },
+            0x3000 => InstructionType::Inst3XNN { x: x, nn: nn },
+            0x4000 => InstructionType::Inst4XNN { x: x, nn: nn },
 
             0x5000 => match opcode & 0x000F {
-                0x0 => InstructionType::Inst5XY0,
+                0x0 => InstructionType::Inst5XY0 { x: x, y: y },
                 _ => panic!("Invalid 0x5 instruction: {opcode:#06X}"),
             },
 
-            0x6000 => InstructionType::Inst6XNN,
-            0x7000 => InstructionType::Inst7XNN,
+            0x6000 => InstructionType::Inst6XNN { x: x, nn: nn },
+            0x7000 => InstructionType::Inst7XNN { x: x, nn: nn },
 
             0x8000 => match opcode & 0x000F {
-                0x0 => InstructionType::Inst8XY0,
-                0x1 => InstructionType::Inst8XY1,
-                0x2 => InstructionType::Inst8XY2,
-                0x3 => InstructionType::Inst8XY3,
-                0x4 => InstructionType::Inst8XY4,
-                0x5 => InstructionType::Inst8XY5,
-                0x6 => InstructionType::Inst8XY6,
-                0x7 => InstructionType::Inst8XY7,
-                0xE => InstructionType::Inst8XYE,
+                0x0 => InstructionType::Inst8XY0 { x: x, y: y },
+                0x1 => InstructionType::Inst8XY1 { x: x, y: y },
+                0x2 => InstructionType::Inst8XY2 { x: x, y: y },
+                0x3 => InstructionType::Inst8XY3 { x: x, y: y },
+                0x4 => InstructionType::Inst8XY4 { x: x, y: y },
+                0x5 => InstructionType::Inst8XY5 { x: x, y: y },
+                0x6 => InstructionType::Inst8XY6 { x: x, y: y },
+                0x7 => InstructionType::Inst8XY7 { x: x, y: y },
+                0xE => InstructionType::Inst8XYE { x: x, y: y },
                 _ => panic!("Invalid 0x8 instruction: {opcode:#06X}"),
             },
 
             0x9000 => match opcode & 0x000F {
-                0x0 => InstructionType::Inst9XY0,
+                0x0 => InstructionType::Inst9XY0 { x: x, y: y },
                 _ => panic!("Invalid 0x9 instruction: {opcode:#06X}"),
             },
 
-            0xA000 => InstructionType::InstANNN,
-            0xB000 => InstructionType::InstBNNN,
+            0xA000 => InstructionType::InstANNN { nnn: nnn },
+            0xB000 => InstructionType::InstBNNN { nnn: nnn },
 
             _ => panic!("Unsupported instruction: {opcode:#06X}"),
         }
@@ -135,33 +142,68 @@ impl Decode for Chip8 {
 
 impl Execute for Chip8 {
     fn execute(&mut self, instruction: InstructionType, opcode: u16) {
-        let nnn = opcode & 0x0FFF;
-        let nn = (opcode & 0x00FF) as u8;
-        let n = (opcode & 0x000F) as u8;
-        let x = ((opcode & 0x0F00) >> 8) as usize;
-        let y = ((opcode & 0x00F0) >> 4) as usize;
         match instruction {
-            InstructionType::Inst00E0 => todo!(),
-            InstructionType::Inst00EE => todo!(),
-            InstructionType::Inst1NNN => todo!(),
-            InstructionType::Inst2NNN => todo!(),
-            InstructionType::Inst3XNN => todo!(),
-            InstructionType::Inst4XNN => todo!(),
-            InstructionType::Inst5XY0 => todo!(),
-            InstructionType::Inst6XNN => todo!(),
-            InstructionType::Inst7XNN => todo!(),
-            InstructionType::Inst9XY0 => todo!(),
-            InstructionType::InstANNN => todo!(),
-            InstructionType::InstBNNN => todo!(),
-            InstructionType::Inst8XY0 => todo!(),
-            InstructionType::Inst8XY1 => todo!(),
-            InstructionType::Inst8XY2 => todo!(),
-            InstructionType::Inst8XY3 => todo!(),
-            InstructionType::Inst8XY4 => todo!(),
-            InstructionType::Inst8XY5 => todo!(),
-            InstructionType::Inst8XY6 => todo!(),
-            InstructionType::Inst8XY7 => todo!(),
-            InstructionType::Inst8XYE => todo!(),
+            InstructionType::Inst00E0 => self.display = [false; 64 * 32],
+            InstructionType::Inst00EE => {
+                if self.sp != 0 {
+                    self.pc = self.stack[0];
+                    self.sp -= 1;
+                } else {
+                    panic!("Attempting to return from an empty stack.");
+                }
+            }
+            InstructionType::Inst1NNN { nnn } => {
+                self.pc = nnn;
+            }
+            InstructionType::Inst2NNN { nnn } => {
+                if self.stack.len() >= 16 {
+                    panic!("stack overflow.");
+                }
+                self.sp += 1;
+                self.stack.push_front(self.pc);
+                self.pc = nnn;
+            }
+            InstructionType::Inst3XNN { x, nn } => {
+                if self.v[x] == nn {
+                    self.pc += 2;
+                }
+            }
+            InstructionType::Inst4XNN { x, nn } => {
+                if self.v[x] != nn {
+                    self.pc += 2;
+                }
+            }
+            InstructionType::Inst5XY0 { x, y } => {
+                if self.v[x] != self.v[y] {
+                    self.pc += 2;
+                }
+            }
+            InstructionType::Inst6XNN { x, nn } => {
+                self.v[x] = nn;
+            }
+            InstructionType::Inst7XNN { x, nn } => {
+                self.v[x] += nn;
+            }
+            InstructionType::Inst9XY0 { x, y } => {
+                if self.v[x] != self.v[y] {
+                    self.pc += 2;
+                }
+            }
+            InstructionType::InstANNN { nnn } => {
+                self.i = nnn;
+            }
+            InstructionType::InstBNNN { nnn } => {
+                self.pc = nnn + self.v[0] as u16;
+            }
+            InstructionType::Inst8XY0 { x, y } => todo!(),
+            InstructionType::Inst8XY1 { x, y } => todo!(),
+            InstructionType::Inst8XY2 { x, y } => todo!(),
+            InstructionType::Inst8XY3 { x, y } => todo!(),
+            InstructionType::Inst8XY4 { x, y } => todo!(),
+            InstructionType::Inst8XY5 { x, y } => todo!(),
+            InstructionType::Inst8XY6 { x, y } => todo!(),
+            InstructionType::Inst8XY7 { x, y } => todo!(),
+            InstructionType::Inst8XYE { x, y } => todo!(),
         }
     }
 }
