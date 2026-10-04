@@ -353,3 +353,39 @@ fn shift_left_stores_lost_bit_in_vf() {
     assert_eq!(with_overflow.registers()[1], 0x02);
     assert_eq!(with_overflow.registers()[0xF], 1);
 }
+
+#[test]
+fn draw_sprite_places_each_bit_at_the_correct_screen_position() {
+    let mut chip8 = mock_chip8(&[0x6102, 0x6203, 0xA208, 0xD121, 0xA500]);
+
+    for _ in 0..4 {
+        chip8.machine_cycle();
+    }
+
+    let row_start = 3 * 64;
+    let expected_pixels = [2, 4, 7, 9];
+
+    for column in 0..64 {
+        assert_eq!(
+            chip8.display()[row_start + column],
+            expected_pixels.contains(&column),
+            "unexpected pixel state at ({column}, 3)"
+        );
+    }
+    assert_eq!(chip8.registers()[0xF], 0);
+}
+
+#[test]
+fn drawing_the_same_sprite_twice_erases_it_and_sets_collision_flag() {
+    let mut chip8 = mock_chip8(&[0x6102, 0x6203, 0xA20A, 0xD121, 0xD121, 0xA500]);
+
+    for _ in 0..4 {
+        chip8.machine_cycle();
+    }
+    assert_eq!(chip8.registers()[0xF], 0);
+
+    chip8.machine_cycle();
+
+    assert!(chip8.display().iter().all(|pixel| !pixel));
+    assert_eq!(chip8.registers()[0xF], 1);
+}

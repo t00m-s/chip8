@@ -262,7 +262,37 @@ impl Execute for Chip8 {
                 self.v[0xf] = (self.v[x] & 0b10000000 != 0) as u8;
                 self.v[x] = self.v[x].wrapping_shl(1);
             }
-            InstructionType::InstDXYN { x, y, n } => todo!(),
+            InstructionType::InstDXYN { x, y, n } => {
+                self.v[0xf] = 0;
+                let starting_x = (self.v[x]) % 64;
+                let starting_y = (self.v[y]) % 32;
+                for row in 0..n {
+                    let screen_y = starting_y + row;
+                    if screen_y >= 32 {
+                        break;
+                    }
+                    let byte = self.memory[self.i as usize + row as usize];
+                    for column in 0..8 {
+                        let screen_x = starting_x + column;
+                        if screen_x >= 64 {
+                            break;
+                        }
+                        /*
+                         * let leftmost_bit = 0b1000_0000;
+                         * let current_bit = leftmost_bit >> column;
+                         * let sprite_pixel_is_on = (sprite_byte & current_bit) != 0;
+                         */
+                        let sprite_pixel = (byte & (0x80 >> column)) != 0;
+                        if sprite_pixel {
+                            let idx = (screen_y * 64 + screen_x) as usize;
+                            if self.display[idx] {
+                                self.v[0xf] = 1;
+                            }
+                            self.display[idx] ^= true;
+                        }
+                    }
+                }
+            }
         }
     }
 }
