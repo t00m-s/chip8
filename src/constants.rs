@@ -1,5 +1,5 @@
-pub const WIDTH: u32 = 800;
-pub const HEIGHT: u32 = 600;
+pub const WIDTH: u32 = 640;
+pub const HEIGHT: u32 = 320;
 pub const WINDOW_NAME: &str = "chip8";
 
 pub const FONTS: [u8; 80] = [

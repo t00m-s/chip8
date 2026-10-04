@@ -1,12 +1,17 @@
-use chip8_emulator::chip8::{Chip8, LoadFont, LoadRom};
+use chip8_emulator::chip8::{Chip8, LoadFont, LoadRom, MachineCycle};
 use chip8_emulator::constants;
-use sdl3::{event::Event, keyboard::Keycode, pixels::Color};
+use sdl3::pixels::Color;
+use sdl3::render::FRect;
+use std::ffi::OsString;
 use std::time::Duration;
 
 fn main() {
+    //
+    let args: Vec<OsString> = std::env::args_os().collect();
     // opening sdl and creating a window
     let sdl_context = sdl3::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
+    // unwrap because yes, if i don't have a window, how am i going to play
     let window = video_subsystem
         .window(constants::WINDOW_NAME, constants::WIDTH, constants::HEIGHT)
         .position_centered()
@@ -16,27 +21,27 @@ fn main() {
     let mut canvas = window.into_canvas(); // where to write pixels
     let mut chip8 = Chip8::default();
     chip8.load_fonts(&constants::FONTS);
-    chip8.load_rom("../roms/ibm-logo.ch8");
-    canvas.set_draw_color(Color::RGB(255, 0, 0));
-    canvas.clear();
-    canvas.present(); // renders window, showing what changed.
-    let mut event_pump = sdl_context.event_pump().unwrap();
-    let mut i = 0;
-    'running: loop {
-        i = (i + 1) % 255;
-        canvas.set_draw_color(Color::RGB(i, 64, 255 - i));
+    chip8.load_rom("roms/ibm-logo.ch8");
+    loop {
+        chip8.machine_cycle();
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => break 'running,
-                _ => {}
+        canvas.set_draw_color(Color::RGB(255, 255, 255));
+        for (i, &pixel) in chip8.display().into_iter().enumerate() {
+            if pixel {
+                let x = i % 64;
+                let y = i / 64;
+                // IF I CHANGE WIDTH AND HEIGHT I NEED TO CHANGE THE SCALE TOO.
+                let x_window = (x * 10) as f32;
+                let y_window = (y * 10) as f32;
+                canvas
+                    .fill_rect(FRect::new(x_window, y_window, 10.0, 10.0))
+                    .expect("Error while drawing.");
             }
         }
+        canvas.present();
+
+        // keeping 60fps
+        std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
-    canvas.present();
-    ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
 }

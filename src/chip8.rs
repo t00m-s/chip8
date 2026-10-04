@@ -264,16 +264,16 @@ impl Execute for Chip8 {
             }
             InstructionType::InstDXYN { x, y, n } => {
                 self.v[0xf] = 0;
-                let starting_x = (self.v[x]) % 64;
-                let starting_y = (self.v[y]) % 32;
+                let starting_x = (self.v[x] % 64) as usize;
+                let starting_y = (self.v[y] % 32) as usize;
                 for row in 0..n {
-                    let screen_y = starting_y + row;
+                    let screen_y = starting_y + row as usize;
                     if screen_y >= 32 {
                         break;
                     }
                     let byte = self.memory[self.i as usize + row as usize];
                     for column in 0..8 {
-                        let screen_x = starting_x + column;
+                        let screen_x = starting_x + column as usize;
                         if screen_x >= 64 {
                             break;
                         }
