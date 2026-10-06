@@ -1,4 +1,5 @@
-use chip8_emulator::chip8::{Chip8, LoadFont, LoadRom, MachineCycle};
+use chip8_emulator::audio::Beeper;
+use chip8_emulator::chip8::{Chip8, LoadFont, LoadRom, MachineCycle, TimerHandler};
 use chip8_emulator::constants;
 use chip8_emulator::keypad::handle_pressed_keys;
 use sdl3::pixels::Color;
@@ -23,6 +24,8 @@ fn main() {
     let mut chip8 = Chip8::default();
     // fine if panics, needed for input.
     let mut event_pump = sdl_context.event_pump().unwrap();
+    let audio_subsystem = sdl_context.audio().unwrap();
+    let mut beeper = Beeper::new(&audio_subsystem);
     chip8.load_fonts(&constants::FONTS);
     chip8.load_rom("roms/ibm-logo.ch8");
     'game_loop: loop {
@@ -58,6 +61,8 @@ fn main() {
         canvas.present();
 
         // keeping 60fps
+        beeper.set_active(chip8.is_audio_active());
+        chip8.handle_timers();
         std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
 }

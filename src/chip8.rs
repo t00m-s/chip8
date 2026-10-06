@@ -25,6 +25,11 @@ trait Execute {
 pub trait MachineCycle {
     fn machine_cycle(&mut self);
 }
+
+pub trait TimerHandler {
+    fn handle_timers(&mut self);
+}
+
 pub struct Chip8 {
     memory: [u8; 4096],
     v: [u8; 16],
@@ -90,6 +95,9 @@ impl Chip8 {
 
     pub fn display_mut(&mut self) -> &mut [bool; 64 * 32] {
         &mut self.display
+    }
+    pub fn is_audio_active(&self) -> bool {
+        self.sound_timer > 0
     }
 }
 
@@ -178,6 +186,9 @@ impl Decode for Chip8 {
             },
             0xF000 => match opcode & 0x00FF {
                 0x0A => InstructionType::InstFX0A { x },
+                0x07 => InstructionType::InstFX07 { x },
+                0x15 => InstructionType::InstFX15 { x },
+                0x18 => InstructionType::InstFX18 { x },
                 _ => panic!("Invalid 0xF instruction: {opcode:#06X}"),
             },
             _ => panic!("Unsupported instruction: {opcode:#06X}"),
@@ -330,6 +341,15 @@ impl Execute for Chip8 {
             InstructionType::InstFX0A { x } => {
                 self.waiting_for_input = Option::Some(x);
             }
+            InstructionType::InstFX07 { x } => {
+                self.v[x] = self.delay_timer;
+            }
+            InstructionType::InstFX15 { x } => {
+                self.delay_timer = self.v[x];
+            }
+            InstructionType::InstFX18 { x } => {
+                self.sound_timer = self.v[x];
+            }
         }
     }
 }
@@ -343,6 +363,7 @@ impl MachineCycle for Chip8 {
         }
     }
 }
+
 impl KeyboardHandler for Chip8 {
     fn set_key(&mut self, key: usize, is_pressed: bool) {
         if let Some(state) = self.keypad.get_mut(key) {
@@ -354,6 +375,18 @@ impl KeyboardHandler for Chip8 {
                     self.v[register] = key as u8;
                 }
             }
+        }
+    }
+}
+
+impl TimerHandler for Chip8 {
+    fn handle_timers(&mut self) {
+        if self.delay_timer > 0 {
+            self.delay_timer -= 1;
+        }
+
+        if self.sound_timer > 0 {
+            self.sound_timer -= 1;
         }
     }
 }

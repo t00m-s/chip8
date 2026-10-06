@@ -26,4 +26,7 @@ pub enum InstructionType {
     InstEX9E { x: usize },
     InstEXA1 { x: usize },
     InstFX0A { x: usize },
+    InstFX07 { x: usize },
+    InstFX15 { x: usize },
+    InstFX18 { x: usize },
 }
