@@ -8,6 +8,9 @@ pub trait LoadFont {
 pub trait LoadRom {
     fn load_rom(&mut self, rom_path: &str);
 }
+pub trait KeyboardHandler {
+    fn set_key(&mut self, key: usize, is_pressed: bool);
+}
 // maybe pub is not it?
 trait Fetch {
     fn fetch(&mut self) -> u16;
@@ -33,6 +36,7 @@ pub struct Chip8 {
     sound_timer: u8,
     display: [bool; 64 * 32],
     keypad: [bool; 16],
+    waiting_for_input: Option<usize>,
 }
 impl Default for Chip8 {
     fn default() -> Self {
@@ -47,6 +51,7 @@ impl Default for Chip8 {
             sound_timer: 0,
             display: [false; 64 * 32],
             keypad: [false; 16],
+            waiting_for_input: None,
         }
     }
 }
@@ -166,7 +171,15 @@ impl Decode for Chip8 {
             0xA000 => InstructionType::InstANNN { nnn: nnn },
             0xB000 => InstructionType::InstBNNN { nnn: nnn },
             0xD000 => InstructionType::InstDXYN { x: x, y: y, n: n },
-
+            0xE000 => match opcode & 0x00FF {
+                0x9E => InstructionType::InstEX9E { x },
+                0xA1 => InstructionType::InstEXA1 { x },
+                _ => panic!("Invalid 0xE instruction: {opcode:#06X}"),
+            },
+            0xF000 => match opcode & 0x00FF {
+                0x0A => InstructionType::InstFX0A { x },
+                _ => panic!("Invalid 0xF instruction: {opcode:#06X}"),
+            },
             _ => panic!("Unsupported instruction: {opcode:#06X}"),
         }
     }
@@ -249,7 +262,7 @@ impl Execute for Chip8 {
                 self.v[x] = res;
                 self.v[0xf] = u8::from(!overflow);
             }
-            InstructionType::Inst8XY6 { x, y } => {
+            InstructionType::Inst8XY6 { x, y: _ } => {
                 self.v[0xf] = (self.v[x] & 0b1 == 1) as u8;
                 self.v[x] = self.v[x].wrapping_shr(1);
             }
@@ -258,7 +271,7 @@ impl Execute for Chip8 {
                 self.v[x] = res;
                 self.v[0xf] = u8::from(!underflow);
             }
-            InstructionType::Inst8XYE { x, y } => {
+            InstructionType::Inst8XYE { x, y: _ } => {
                 self.v[0xf] = (self.v[x] & 0b10000000 != 0) as u8;
                 self.v[x] = self.v[x].wrapping_shl(1);
             }
@@ -293,14 +306,54 @@ impl Execute for Chip8 {
                     }
                 }
             }
+            InstructionType::InstEX9E { x } => {
+                // get the key from the register, if pressed skip
+                if self
+                    .keypad
+                    .get(self.v[x] as usize)
+                    .copied()
+                    .unwrap_or(false)
+                {
+                    self.pc += 2;
+                }
+            }
+            InstructionType::InstEXA1 { x } => {
+                if !self
+                    .keypad
+                    .get(self.v[x] as usize)
+                    .copied()
+                    .unwrap_or(false)
+                {
+                    self.pc += 2;
+                }
+            }
+            InstructionType::InstFX0A { x } => {
+                self.waiting_for_input = Option::Some(x);
+            }
         }
     }
 }
 
 impl MachineCycle for Chip8 {
     fn machine_cycle(&mut self) {
-        let opcode = self.fetch();
-        let instruction = self.decode(opcode);
-        self.execute(instruction);
+        if self.waiting_for_input.is_none() {
+            let opcode = self.fetch();
+            let instruction = self.decode(opcode);
+            self.execute(instruction);
+        }
+    }
+}
+impl KeyboardHandler for Chip8 {
+    fn set_key(&mut self, key: usize, is_pressed: bool) {
+        if let Some(state) = self.keypad.get_mut(key) {
+            let is_new_press = is_pressed && !*state;
+            *state = is_pressed;
+
+            if is_new_press {
+                if let Some(register) = self.waiting_for_input.take() {
+                    self.v[register] = key as u8;
+                }
+            }
+        }
     }
 }

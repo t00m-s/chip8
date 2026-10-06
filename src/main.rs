@@ -1,5 +1,6 @@
 use chip8_emulator::chip8::{Chip8, LoadFont, LoadRom, MachineCycle};
 use chip8_emulator::constants;
+use chip8_emulator::keypad::handle_pressed_keys;
 use sdl3::pixels::Color;
 use sdl3::render::FRect;
 use std::ffi::OsString;
@@ -20,9 +21,24 @@ fn main() {
 
     let mut canvas = window.into_canvas(); // where to write pixels
     let mut chip8 = Chip8::default();
+    // fine if panics, needed for input.
+    let mut event_pump = sdl_context.event_pump().unwrap();
     chip8.load_fonts(&constants::FONTS);
     chip8.load_rom("roms/ibm-logo.ch8");
-    loop {
+    'game_loop: loop {
+        for event in event_pump.poll_iter() {
+            match event {
+                sdl3::event::Event::Quit { timestamp: _ } => {
+                    drop(canvas);
+                    break 'game_loop;
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+        let keyboard = event_pump.keyboard_state();
+        handle_pressed_keys(&mut chip8, keyboard);
         chip8.machine_cycle();
         canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.clear();
