@@ -1,4 +1,4 @@
-use chip8_emulator::chip8::{Chip8, LoadFont, LoadRom, MachineCycle};
+use chip8_emulator::chip8::{Chip8, KeyboardHandler, LoadFont, LoadRom, MachineCycle};
 use chip8_emulator::constants::FONTS;
 
 fn mock_chip8(opcodes: &[u16]) -> Chip8 {
@@ -388,4 +388,61 @@ fn drawing_the_same_sprite_twice_erases_it_and_sets_collision_flag() {
 
     assert!(chip8.display().iter().all(|pixel| !pixel));
     assert_eq!(chip8.registers()[0xF], 1);
+}
+
+#[test]
+fn pressed_key_causes_ex9e_to_skip_the_next_instruction() {
+    let mut chip8 = mock_chip8(&[0x610A, 0xE19E]);
+    chip8.set_key(0xA, true);
+
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+
+    assert_eq!(chip8.program_counter(), 0x206);
+}
+
+#[test]
+fn unpressed_key_causes_exa1_to_skip_the_next_instruction() {
+    let mut chip8 = mock_chip8(&[0x610A, 0xE1A1]);
+
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+
+    assert_eq!(chip8.program_counter(), 0x206);
+}
+
+#[test]
+fn fx0a_halts_until_a_new_key_press_and_stores_the_key() {
+    let mut chip8 = mock_chip8(&[0xF30A, 0x6401]);
+
+    chip8.machine_cycle();
+    assert_eq!(chip8.program_counter(), 0x202);
+
+    chip8.machine_cycle();
+    assert_eq!(chip8.program_counter(), 0x202);
+    assert_eq!(chip8.registers()[4], 0);
+
+    chip8.set_key(0xC, true);
+    assert_eq!(chip8.registers()[3], 0xC);
+
+    chip8.machine_cycle();
+    assert_eq!(chip8.program_counter(), 0x204);
+    assert_eq!(chip8.registers()[4], 1);
+}
+
+#[test]
+fn fx0a_does_not_accept_a_key_that_was_already_held() {
+    let mut chip8 = mock_chip8(&[0xF20A, 0x6301]);
+    chip8.set_key(0x5, true);
+
+    chip8.machine_cycle();
+    chip8.set_key(0x5, true);
+    chip8.machine_cycle();
+
+    assert_eq!(chip8.program_counter(), 0x202);
+    assert_eq!(chip8.registers()[2], 0);
+
+    chip8.set_key(0x5, false);
+    chip8.set_key(0x5, true);
+    assert_eq!(chip8.registers()[2], 0x5);
 }
