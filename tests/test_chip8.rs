@@ -1,4 +1,6 @@
-use chip8_emulator::chip8::{Chip8, KeyboardHandler, LoadFont, LoadRom, MachineCycle};
+use chip8_emulator::chip8::{
+    Chip8, KeyboardHandler, LoadFont, LoadRom, MachineCycle, TimerHandler,
+};
 use chip8_emulator::constants::FONTS;
 
 fn mock_chip8(opcodes: &[u16]) -> Chip8 {
@@ -445,4 +447,217 @@ fn fx0a_does_not_accept_a_key_that_was_already_held() {
     chip8.set_key(0x5, false);
     chip8.set_key(0x5, true);
     assert_eq!(chip8.registers()[2], 0x5);
+}
+
+#[test]
+fn fx15_sets_delay_timer_and_fx07_reads_without_consuming_it() {
+    for value in [0_u16, 1, 0x80, 0xFF] {
+        let mut chip8 = mock_chip8(&[0x6300 | value, 0xF315, 0x6300, 0xF707, 0xF807]);
+
+        for _ in 0..5 {
+            chip8.machine_cycle();
+        }
+
+        let mut expected_registers = [0; 16];
+        expected_registers[7] = value as u8;
+        expected_registers[8] = value as u8;
+        assert_eq!(
+            *chip8.registers(),
+            expected_registers,
+            "reading delay timer value {value}"
+        );
+        assert_eq!(chip8.program_counter(), 0x20A);
+        assert!(!chip8.is_audio_active());
+    }
+}
+
+#[test]
+fn delay_timer_decrements_once_per_tick_and_stops_at_zero() {
+    let mut chip8 = mock_chip8(&[0x6103, 0xF115, 0xF207, 0x1204]);
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+
+    for expected in [3, 2, 1, 0, 0] {
+        chip8.machine_cycle();
+        assert_eq!(chip8.registers()[2], expected);
+
+        chip8.machine_cycle(); // Jump back to the delay-timer read.
+        chip8.handle_timers();
+    }
+}
+
+#[test]
+fn fx18_activates_sound_for_the_requested_number_of_ticks() {
+    for value in [0_u16, 1, 3, 0xFF] {
+        let mut chip8 = mock_chip8(&[0x6900 | value, 0xF918, 0x6900]);
+        assert!(!chip8.is_audio_active());
+
+        chip8.machine_cycle();
+        chip8.machine_cycle();
+        assert_eq!(chip8.is_audio_active(), value > 0);
+
+        chip8.machine_cycle(); // Changing V9 must not change the loaded timer.
+        assert_eq!(chip8.is_audio_active(), value > 0);
+
+        for elapsed in 1..=value {
+            chip8.handle_timers();
+            assert_eq!(
+                chip8.is_audio_active(),
+                elapsed < value,
+                "sound timer {value} after {elapsed} ticks"
+            );
+        }
+
+        for _ in 0..3 {
+            chip8.handle_timers();
+            assert!(!chip8.is_audio_active(), "zero sound timer must not wrap");
+        }
+    }
+}
+
+#[test]
+fn fx15_replaces_the_remaining_delay_timer() {
+    for value in [0_u16, 1, 5] {
+        let mut chip8 = mock_chip8(&[0x6403, 0xF415, 0x6400 | value, 0xF415, 0xF507]);
+        chip8.machine_cycle();
+        chip8.machine_cycle();
+        chip8.handle_timers(); // Two ticks remain before the timer is replaced.
+
+        for _ in 0..3 {
+            chip8.machine_cycle();
+        }
+
+        assert_eq!(chip8.registers()[5], value as u8);
+        assert_eq!(chip8.registers()[4], value as u8);
+    }
+}
+
+#[test]
+fn fx18_replaces_the_remaining_sound_timer() {
+    for value in [0_u16, 1, 5] {
+        let mut chip8 = mock_chip8(&[0x6403, 0xF418, 0x6400 | value, 0xF418]);
+        chip8.machine_cycle();
+        chip8.machine_cycle();
+        chip8.handle_timers();
+        assert!(chip8.is_audio_active());
+
+        chip8.machine_cycle();
+        chip8.machine_cycle();
+        assert_eq!(chip8.is_audio_active(), value > 0);
+
+        for elapsed in 1..=value {
+            chip8.handle_timers();
+            assert_eq!(
+                chip8.is_audio_active(),
+                elapsed < value,
+                "replacement sound timer {value} after {elapsed} ticks"
+            );
+        }
+    }
+}
+
+#[test]
+fn cpu_cycles_do_not_decrement_timers() {
+    let mut chip8 = mock_chip8(&[0x6102, 0xF115, 0xF118, 0xF207, 0x1206]);
+    for _ in 0..3 {
+        chip8.machine_cycle();
+    }
+
+    for _ in 0..100 {
+        chip8.machine_cycle();
+    }
+
+    assert_eq!(chip8.registers()[2], 2);
+    assert!(chip8.is_audio_active());
+
+    chip8.handle_timers();
+    assert!(chip8.is_audio_active());
+    chip8.handle_timers();
+    assert!(!chip8.is_audio_active());
+
+    chip8.machine_cycle();
+    assert_eq!(chip8.registers()[2], 0);
+}
+
+#[test]
+fn timer_ticks_do_not_execute_cpu_instructions() {
+    let mut chip8 = mock_chip8(&[0x6103, 0xF115, 0xF118, 0x6201, 0xF307]);
+    for _ in 0..3 {
+        chip8.machine_cycle();
+    }
+    let registers_before_ticks = *chip8.registers();
+
+    chip8.handle_timers();
+    chip8.handle_timers();
+
+    assert_eq!(chip8.program_counter(), 0x206);
+    assert_eq!(*chip8.registers(), registers_before_ticks);
+    assert!(chip8.is_audio_active());
+
+    chip8.machine_cycle();
+    chip8.machine_cycle();
+    assert_eq!(chip8.registers()[2], 1);
+    assert_eq!(chip8.registers()[3], 1);
+
+    chip8.handle_timers();
+    assert!(!chip8.is_audio_active());
+}
+
+#[test]
+fn delay_and_sound_timers_count_down_independently() {
+    for (delay, sound) in [(1_u16, 3_u16), (3, 1)] {
+        let mut chip8 = mock_chip8(&[
+            0x6100 | delay,
+            0xF115,
+            0x6200 | sound,
+            0xF218,
+            0xF307,
+            0x1208,
+        ]);
+        for _ in 0..4 {
+            chip8.machine_cycle();
+        }
+
+        for elapsed in 0..=4 {
+            chip8.machine_cycle();
+            assert_eq!(
+                chip8.registers()[3],
+                delay.saturating_sub(elapsed) as u8,
+                "delay timer {delay} after {elapsed} ticks"
+            );
+            assert_eq!(
+                chip8.is_audio_active(),
+                elapsed < sound,
+                "sound timer {sound} after {elapsed} ticks"
+            );
+
+            chip8.machine_cycle(); // Jump back to the delay-timer read.
+            chip8.handle_timers();
+        }
+    }
+}
+
+#[test]
+fn timers_continue_while_fx0a_waits_for_a_key() {
+    let mut chip8 = mock_chip8(&[0x6104, 0xF115, 0x6202, 0xF218, 0xF40A, 0xF507]);
+    for _ in 0..5 {
+        chip8.machine_cycle();
+    }
+    let registers_while_waiting = *chip8.registers();
+
+    for sound_active in [true, false, false] {
+        chip8.machine_cycle();
+        chip8.handle_timers();
+
+        assert_eq!(chip8.program_counter(), 0x20A);
+        assert_eq!(*chip8.registers(), registers_while_waiting);
+        assert_eq!(chip8.is_audio_active(), sound_active);
+    }
+
+    chip8.set_key(0xA, true);
+    chip8.machine_cycle();
+
+    assert_eq!(chip8.registers()[4], 0xA);
+    assert_eq!(chip8.registers()[5], 1);
+    assert_eq!(chip8.program_counter(), 0x20C);
 }
