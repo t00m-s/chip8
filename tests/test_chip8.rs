@@ -10,6 +10,7 @@ fn mock_chip8(opcodes: &[u16]) -> Chip8 {
         .collect();
 
     let mut chip8 = Chip8::default();
+    chip8.load_fonts(&FONTS);
     chip8.load_program(&program);
     chip8
 }
@@ -660,4 +661,92 @@ fn timers_continue_while_fx0a_waits_for_a_key() {
     assert_eq!(chip8.registers()[4], 0xA);
     assert_eq!(chip8.registers()[5], 1);
     assert_eq!(chip8.program_counter(), 0x20C);
+}
+
+#[test]
+fn random_byte_is_masked_by_nn() {
+    for _ in 0..64 {
+        let mut chip8 = mock_chip8(&[0xC3A5]);
+
+        chip8.machine_cycle();
+
+        assert_eq!(chip8.registers()[3] & !0xA5, 0);
+    }
+
+    let mut zero_mask = mock_chip8(&[0xC700]);
+    zero_mask.machine_cycle();
+    assert_eq!(zero_mask.registers()[7], 0);
+}
+
+#[test]
+fn add_register_to_index_register() {
+    let mut chip8 = mock_chip8(&[0xA345, 0x61AB, 0xF11E]);
+
+    for _ in 0..3 {
+        chip8.machine_cycle();
+    }
+
+    assert_eq!(chip8.index_register(), 0x3F0);
+}
+
+#[test]
+fn font_character_sets_index_to_its_sprite() {
+    for digit in 0_u16..=0xF {
+        let mut chip8 = mock_chip8(&[0x6300 | digit, 0xF329]);
+
+        chip8.machine_cycle();
+        chip8.machine_cycle();
+
+        let expected_address = 0x50 + digit * 5;
+        assert_eq!(chip8.index_register(), expected_address);
+        assert_eq!(
+            &chip8.memory()[expected_address as usize..expected_address as usize + 5],
+            &FONTS[digit as usize * 5..digit as usize * 5 + 5]
+        );
+    }
+}
+
+#[test]
+fn binary_coded_decimal_stores_all_three_digits() {
+    for (value, expected) in [
+        (0_u16, [0, 0, 0]),
+        (7, [0, 0, 7]),
+        (42, [0, 4, 2]),
+        (255, [2, 5, 5]),
+    ] {
+        let mut chip8 = mock_chip8(&[0xA300, 0x6100 | value, 0xF133]);
+
+        for _ in 0..3 {
+            chip8.machine_cycle();
+        }
+
+        assert_eq!(&chip8.memory()[0x300..0x303], &expected);
+        assert_eq!(chip8.index_register(), 0x300);
+    }
+}
+
+#[test]
+fn store_registers_writes_v0_through_vx_inclusively() {
+    let mut chip8 = mock_chip8(&[0x600A, 0x611B, 0x622C, 0xA300, 0xF255]);
+
+    for _ in 0..5 {
+        chip8.machine_cycle();
+    }
+
+    assert_eq!(&chip8.memory()[0x300..0x303], &[0x0A, 0x1B, 0x2C]);
+    assert_eq!(chip8.index_register(), 0x300);
+}
+
+#[test]
+fn load_registers_reads_v0_through_vx_inclusively() {
+    let mut chip8 = mock_chip8(&[
+        0x600A, 0x611B, 0x622C, 0xA300, 0xF255, 0x6000, 0x6100, 0x6200, 0xF265,
+    ]);
+
+    for _ in 0..9 {
+        chip8.machine_cycle();
+    }
+
+    assert_eq!(&chip8.registers()[0..3], &[0x0A, 0x1B, 0x2C]);
+    assert_eq!(chip8.index_register(), 0x300);
 }
