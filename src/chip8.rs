@@ -1,7 +1,10 @@
-use std::collections::VecDeque;
-
 use super::opcode::InstructionType;
 use super::rom::read_rom_from_path;
+use rand::{
+    RngExt, SeedableRng,
+    rngs::{StdRng, SysRng},
+};
+use std::collections::VecDeque;
 pub trait LoadFont {
     fn load_fonts(&mut self, fonts: &[u8; 80]);
 }
@@ -42,6 +45,7 @@ pub struct Chip8 {
     display: [bool; 64 * 32],
     keypad: [bool; 16],
     waiting_for_input: Option<usize>,
+    rng: StdRng,
 }
 impl Default for Chip8 {
     fn default() -> Self {
@@ -57,6 +61,7 @@ impl Default for Chip8 {
             display: [false; 64 * 32],
             keypad: [false; 16],
             waiting_for_input: None,
+            rng: StdRng::try_from_rng(&mut SysRng).expect("failed to initialize rng."),
         }
     }
 }
@@ -178,6 +183,7 @@ impl Decode for Chip8 {
 
             0xA000 => InstructionType::InstANNN { nnn: nnn },
             0xB000 => InstructionType::InstBNNN { nnn: nnn },
+            0xC000 => InstructionType::InstCXNN { x: x, nn: nn },
             0xD000 => InstructionType::InstDXYN { x: x, y: y, n: n },
             0xE000 => match opcode & 0x00FF {
                 0x9E => InstructionType::InstEX9E { x },
@@ -189,6 +195,11 @@ impl Decode for Chip8 {
                 0x07 => InstructionType::InstFX07 { x },
                 0x15 => InstructionType::InstFX15 { x },
                 0x18 => InstructionType::InstFX18 { x },
+                0x1E => InstructionType::InstFX1E { x },
+                0x29 => InstructionType::InstFX29 { x },
+                0x33 => InstructionType::InstFX33 { x },
+                0x55 => InstructionType::InstFX55 { x },
+                0x65 => InstructionType::InstFX65 { x },
                 _ => panic!("Invalid 0xF instruction: {opcode:#06X}"),
             },
             _ => panic!("Unsupported instruction: {opcode:#06X}"),
@@ -349,6 +360,39 @@ impl Execute for Chip8 {
             }
             InstructionType::InstFX18 { x } => {
                 self.sound_timer = self.v[x];
+            }
+            InstructionType::InstCXNN { x, nn } => {
+                self.v[x] = self.rng.random::<u8>() & nn;
+            }
+            InstructionType::InstFX1E { x } => {
+                self.i += self.v[x] as u16;
+            }
+            InstructionType::InstFX29 { x } => {
+                let vx = self.v[x];
+                // 0x50 -  starting fonts addr
+                // every letter is 5 bytes long
+                self.i = 0x50 + (vx * 5) as u16;
+            }
+            InstructionType::InstFX33 { x } => {
+                // Store BCD representation of Vx in memory locations I, I+1, and I+2.
+                //
+                // The interpreter takes the decimal value of Vx, and places the hundreds digit in memory at location in I, the tens digit at location I+1, and the ones digit at location I+2.
+                let hundreds = self.v[x] / 100;
+                let dec = (self.v[x] / 10) % 10;
+                let units = self.v[x] % 10;
+                self.memory[self.i as usize] = hundreds;
+                self.memory[(self.i + 1) as usize] = dec;
+                self.memory[(self.i + 2) as usize] = units;
+            }
+            InstructionType::InstFX55 { x } => {
+                for register in 0..=x {
+                    self.memory[self.i as usize + register] = self.v[register]
+                }
+            }
+            InstructionType::InstFX65 { x } => {
+                for register in 0..=x {
+                    self.v[register] = self.memory[self.i as usize + register]
+                }
             }
         }
     }
