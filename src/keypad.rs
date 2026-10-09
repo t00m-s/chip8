@@ -12,7 +12,7 @@ pub fn handle_pressed_keys(chip8: &mut Chip8, keyboard: KeyboardState<'_>) {
      * A 0 B F      Z X C V
      */
     chip8.set_key(
-        0x1,
+        0x4,
         keyboard.is_scancode_pressed(sdl3::keyboard::Scancode::Q),
     );
     chip8.set_key(
