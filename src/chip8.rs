@@ -132,7 +132,7 @@ impl Fetch for Chip8 {
         let second = self.memory[(self.pc + 1) as usize];
         let opcode = (first as u16) << 8 | second as u16;
         self.pc += 2;
-        return opcode;
+        opcode
     }
 }
 
@@ -150,41 +150,41 @@ impl Decode for Chip8 {
                 _ => panic!("Unsupported 0x0 instruction: {opcode:#06X}"),
             },
 
-            0x1000 => InstructionType::Inst1NNN { nnn: nnn },
-            0x2000 => InstructionType::Inst2NNN { nnn: nnn },
-            0x3000 => InstructionType::Inst3XNN { x: x, nn: nn },
-            0x4000 => InstructionType::Inst4XNN { x: x, nn: nn },
+            0x1000 => InstructionType::Inst1NNN { nnn },
+            0x2000 => InstructionType::Inst2NNN { nnn },
+            0x3000 => InstructionType::Inst3XNN { x, nn },
+            0x4000 => InstructionType::Inst4XNN { x, nn },
 
             0x5000 => match opcode & 0x000F {
-                0x0 => InstructionType::Inst5XY0 { x: x, y: y },
+                0x0 => InstructionType::Inst5XY0 { x, y },
                 _ => panic!("Invalid 0x5 instruction: {opcode:#06X}"),
             },
 
-            0x6000 => InstructionType::Inst6XNN { x: x, nn: nn },
-            0x7000 => InstructionType::Inst7XNN { x: x, nn: nn },
+            0x6000 => InstructionType::Inst6XNN { x, nn },
+            0x7000 => InstructionType::Inst7XNN { x, nn },
 
             0x8000 => match opcode & 0x000F {
-                0x0 => InstructionType::Inst8XY0 { x: x, y: y },
-                0x1 => InstructionType::Inst8XY1 { x: x, y: y },
-                0x2 => InstructionType::Inst8XY2 { x: x, y: y },
-                0x3 => InstructionType::Inst8XY3 { x: x, y: y },
-                0x4 => InstructionType::Inst8XY4 { x: x, y: y },
-                0x5 => InstructionType::Inst8XY5 { x: x, y: y },
-                0x6 => InstructionType::Inst8XY6 { x: x, y: y },
-                0x7 => InstructionType::Inst8XY7 { x: x, y: y },
-                0xE => InstructionType::Inst8XYE { x: x, y: y },
+                0x0 => InstructionType::Inst8XY0 { x, y },
+                0x1 => InstructionType::Inst8XY1 { x, y },
+                0x2 => InstructionType::Inst8XY2 { x, y },
+                0x3 => InstructionType::Inst8XY3 { x, y },
+                0x4 => InstructionType::Inst8XY4 { x, y },
+                0x5 => InstructionType::Inst8XY5 { x, y },
+                0x6 => InstructionType::Inst8XY6 { x },
+                0x7 => InstructionType::Inst8XY7 { x, y },
+                0xE => InstructionType::Inst8XYE { x },
                 _ => panic!("Invalid 0x8 instruction: {opcode:#06X}"),
             },
 
             0x9000 => match opcode & 0x000F {
-                0x0 => InstructionType::Inst9XY0 { x: x, y: y },
+                0x0 => InstructionType::Inst9XY0 { x, y },
                 _ => panic!("Invalid 0x9 instruction: {opcode:#06X}"),
             },
 
-            0xA000 => InstructionType::InstANNN { nnn: nnn },
-            0xB000 => InstructionType::InstBNNN { nnn: nnn },
-            0xC000 => InstructionType::InstCXNN { x: x, nn: nn },
-            0xD000 => InstructionType::InstDXYN { x: x, y: y, n: n },
+            0xA000 => InstructionType::InstANNN { nnn },
+            0xB000 => InstructionType::InstBNNN { nnn },
+            0xC000 => InstructionType::InstCXNN { x, nn },
+            0xD000 => InstructionType::InstDXYN { x, y, n },
             0xE000 => match opcode & 0x00FF {
                 0x9E => InstructionType::InstEX9E { x },
                 0xA1 => InstructionType::InstEXA1 { x },
@@ -284,7 +284,7 @@ impl Execute for Chip8 {
                 self.v[x] = res;
                 self.v[0xf] = u8::from(!overflow);
             }
-            InstructionType::Inst8XY6 { x, y: _ } => {
+            InstructionType::Inst8XY6 { x } => {
                 self.v[0xf] = (self.v[x] & 0b1 == 1) as u8;
                 self.v[x] = self.v[x].wrapping_shr(1);
             }
@@ -293,7 +293,7 @@ impl Execute for Chip8 {
                 self.v[x] = res;
                 self.v[0xf] = u8::from(!underflow);
             }
-            InstructionType::Inst8XYE { x, y: _ } => {
+            InstructionType::Inst8XYE { x } => {
                 self.v[0xf] = (self.v[x] & 0b10000000 != 0) as u8;
                 self.v[x] = self.v[x].wrapping_shl(1);
             }
@@ -319,7 +319,7 @@ impl Execute for Chip8 {
                          */
                         let sprite_pixel = (byte & (0x80 >> column)) != 0;
                         if sprite_pixel {
-                            let idx = (screen_y * 64 + screen_x) as usize;
+                            let idx = (screen_y * 64) + screen_x;
                             if self.display[idx] {
                                 self.v[0xf] = 1;
                             }
@@ -414,10 +414,8 @@ impl KeyboardHandler for Chip8 {
             let is_new_press = is_pressed && !*state;
             *state = is_pressed;
 
-            if is_new_press {
-                if let Some(register) = self.waiting_for_input.take() {
-                    self.v[register] = key as u8;
-                }
+            if is_new_press && let Some(register) = self.waiting_for_input.take() {
+                self.v[register] = key as u8;
             }
         }
     }

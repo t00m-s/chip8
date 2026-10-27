@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 fn main() {
     //
-    let args: Vec<OsString> = std::env::args_os().collect();
+    let _args: Vec<OsString> = std::env::args_os().collect();
     // opening sdl and creating a window
     let sdl_context = sdl3::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -38,12 +38,9 @@ fn main() {
     let mut next_60hz_tick = starting_timer + timers_delay;
     'game_loop: loop {
         for event in event_pump.poll_iter() {
-            match event {
-                sdl3::event::Event::Quit { timestamp: _ } => {
-                    drop(canvas);
-                    break 'game_loop;
-                }
-                _ => {}
+            if let sdl3::event::Event::Quit { timestamp: _ } = event {
+                drop(canvas);
+                break 'game_loop;
             }
         }
         let keyboard = event_pump.keyboard_state();
@@ -58,7 +55,7 @@ fn main() {
             canvas.set_draw_color(Color::RGB(0, 0, 0));
             canvas.clear();
             canvas.set_draw_color(Color::RGB(255, 255, 255));
-            for (i, &pixel) in chip8.display().into_iter().enumerate() {
+            for (i, &pixel) in chip8.display().iter().enumerate() {
                 if pixel {
                     let x = i % 64;
                     let y = i / 64;

@@ -11,5 +11,5 @@ pub fn read_rom_from_path(rom_path: &str) -> Vec<u8> {
     rom.read_to_end(&mut buffer)
         .expect("Failed to read file contents");
 
-    return buffer;
+    buffer
 }
